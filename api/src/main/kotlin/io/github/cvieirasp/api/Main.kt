@@ -1,6 +1,7 @@
 package io.github.cvieirasp.api
 
 import io.github.cvieirasp.api.plugins.configureDatabase
+import io.github.cvieirasp.api.plugins.configureRabbitMQ
 import io.github.cvieirasp.api.plugins.configureRouting
 import io.github.cvieirasp.api.plugins.configureSerialization
 import io.github.cvieirasp.api.plugins.configureStatusPages
@@ -17,5 +18,6 @@ fun Application.module() {
     configureSerialization()
     configureStatusPages()
     configureDatabase()
+    configureRabbitMQ()
     configureRouting()
 }

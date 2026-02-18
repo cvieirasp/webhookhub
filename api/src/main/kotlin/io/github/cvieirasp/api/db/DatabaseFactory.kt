@@ -2,6 +2,7 @@ package io.github.cvieirasp.api.db
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import io.github.cvieirasp.shared.config.EnvConfig
 import kotlinx.serialization.Serializable
 import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.sql.Database
@@ -30,9 +31,9 @@ object DatabaseFactory {
      */
     fun init() {
         dataSource = HikariDataSource(HikariConfig().apply {
-            jdbcUrl = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/webhookhub"
-            username = System.getenv("DB_USER") ?: "webhookhub"
-            password = System.getenv("DB_PASSWORD") ?: "webhookhub"
+            jdbcUrl = EnvConfig.Database.url
+            username = EnvConfig.Database.user
+            password = EnvConfig.Database.password
             driverClassName = "org.postgresql.Driver"
             maximumPoolSize = 10
             isAutoCommit = false
