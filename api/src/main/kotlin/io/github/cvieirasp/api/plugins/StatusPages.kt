@@ -1,5 +1,6 @@
 package io.github.cvieirasp.api.plugins
 
+import io.github.cvieirasp.api.NotFoundException
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.BadRequestException
@@ -20,6 +21,9 @@ fun Application.configureStatusPages() {
      * responding with appropriate HTTP status codes and error messages.
      */
     install(StatusPages) {
+        exception<NotFoundException> { call, cause ->
+            call.respond(HttpStatusCode.NotFound, ErrorResponse(cause.message ?: "Not found"))
+        }
         exception<BadRequestException> { call, cause ->
             call.respond(HttpStatusCode.BadRequest, ErrorResponse(cause.message ?: "Bad request"))
         }
