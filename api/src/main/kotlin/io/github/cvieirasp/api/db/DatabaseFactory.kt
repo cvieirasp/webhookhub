@@ -31,12 +31,31 @@ object DatabaseFactory {
      */
     fun init() {
         dataSource = HikariDataSource(HikariConfig().apply {
-            jdbcUrl = EnvConfig.Database.url
-            username = EnvConfig.Database.user
-            password = EnvConfig.Database.password
-            driverClassName = "org.postgresql.Driver"
-            maximumPoolSize = 10
-            isAutoCommit = false
+            poolName             = "WebhookHubApiPool"
+            jdbcUrl              = EnvConfig.Database.url
+            username             = EnvConfig.Database.user
+            password             = EnvConfig.Database.password
+            driverClassName      = "org.postgresql.Driver"
+
+            // Pool sizing: sized for concurrent HTTP request handling.
+            maximumPoolSize      = 10
+            minimumIdle          = 2
+
+            // How long a caller waits for a connection before an exception is thrown.
+            connectionTimeout    = 10_000   // 10 s
+
+            // Remove connections that have been idle longer than this.
+            idleTimeout          = 600_000  // 10 min
+
+            // Retire connections before the PostgreSQL server-side idle timeout closes them.
+            maxLifetime          = 1_800_000 // 30 min
+
+            // Periodically validate idle connections so stale sockets are caught
+            // before they are handed to the application.
+            keepaliveTime        = 30_000   // 30 s
+
+            // Explicit transaction management via Exposed transaction { } blocks.
+            isAutoCommit         = false
             transactionIsolation = "TRANSACTION_REPEATABLE_READ"
             validate()
         })
