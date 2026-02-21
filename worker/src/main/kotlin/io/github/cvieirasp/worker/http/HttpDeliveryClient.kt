@@ -25,6 +25,15 @@ import org.slf4j.LoggerFactory
  * A non-2xx response is treated as a soft failure (returned as [Result.Failure])
  * so the caller can decide whether to retry.  Network-level exceptions (timeout,
  * DNS failure, TLS error, etc.) are caught and also returned as [Result.Failure].
+ *
+ * Every [Result.Failure] carries a [Result.Failure.retryable] flag:
+ *
+ * | Condition | retryable |
+ * |---|---|
+ * | Network / timeout exception | true  |
+ * | HTTP 429 Too Many Requests  | true  |
+ * | HTTP 5xx server error       | true  |
+ * | HTTP 4xx client error (≠429)| false |
  */
 class HttpDeliveryClient {
 
@@ -63,12 +72,22 @@ class HttpDeliveryClient {
                 logger.debug("POST {} → {}", url, response.status.value)
                 Result.Success
             } else {
-                logger.warn("POST {} → HTTP {}", url, response.status.value)
-                Result.Failure("HTTP ${response.status.value} from $url")
+                val code      = response.status.value
+                val retryable = code == 429 || code in 500..599
+                logger.warn("POST {} → HTTP {} ({})", url, code, if (retryable) "retryable" else "non-retryable")
+                Result.Failure(
+                    message    = "HTTP $code from $url",
+                    statusCode = code,
+                    retryable  = retryable,
+                )
             }
         } catch (e: Exception) {
-            logger.warn("POST {} failed: {}", url, e.message)
-            Result.Failure(e.message ?: "Unknown error")
+            logger.warn("POST {} failed (retryable): {}", url, e.message)
+            Result.Failure(
+                message    = e.message ?: "Unknown error",
+                statusCode = null,
+                retryable  = true,
+            )
         }
     }
 
@@ -77,6 +96,20 @@ class HttpDeliveryClient {
 
     sealed interface Result {
         data object Success : Result
-        data class Failure(val message: String) : Result
+
+        /**
+         * @param message   Human-readable description of the error.
+         * @param statusCode HTTP status code, or `null` for network-level failures
+         *                   (timeout, DNS error, TLS error, etc.).
+         * @param retryable  `true` when the caller should schedule a retry:
+         *                   network failures, HTTP 429, and HTTP 5xx.
+         *                   `false` for HTTP 4xx responses other than 429,
+         *                   which indicate a permanent client-side problem.
+         */
+        data class Failure(
+            val message: String,
+            val statusCode: Int?,
+            val retryable: Boolean,
+        ) : Result
     }
 }

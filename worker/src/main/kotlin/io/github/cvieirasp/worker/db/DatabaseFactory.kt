@@ -17,12 +17,27 @@ object DatabaseFactory {
     private lateinit var dataSource: HikariDataSource
     private lateinit var db: Database
 
-    fun init() {
-        dataSource = HikariDataSource(HikariConfig().apply {
+    /** Initialises the pool from environment-variable configuration (production entry point). */
+    fun init() = init(EnvConfig.Database.url, EnvConfig.Database.user, EnvConfig.Database.password)
+
+    /**
+     * Initialises the pool with explicit connection parameters.
+     *
+     * Used by integration tests, which obtain the JDBC URL, username, and password
+     * from a [org.testcontainers.containers.PostgreSQLContainer] rather than from
+     * environment variables.
+     */
+    fun init(jdbcUrl: String, username: String, password: String) {
+        dataSource = buildDataSource(jdbcUrl, username, password)
+        db = Database.connect(dataSource)
+    }
+
+    private fun buildDataSource(jdbcUrl: String, username: String, password: String) =
+        HikariDataSource(HikariConfig().apply {
             poolName            = "WebhookHubWorkerPool"
-            jdbcUrl             = EnvConfig.Database.url
-            username            = EnvConfig.Database.user
-            password            = EnvConfig.Database.password
+            this.jdbcUrl        = jdbcUrl
+            this.username       = username
+            this.password       = password
             driverClassName     = "org.postgresql.Driver"
 
             // Pool sizing: the worker uses a bounded concurrency semaphore for HTTP delivery,
@@ -53,9 +68,6 @@ object DatabaseFactory {
 
             validate()
         })
-
-        db = Database.connect(dataSource)
-    }
 
     /**
      * Sends a lightweight query to verify the database connection is reachable.
