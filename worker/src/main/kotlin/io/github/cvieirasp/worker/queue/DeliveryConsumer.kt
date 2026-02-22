@@ -6,6 +6,7 @@ import com.rabbitmq.client.DefaultConsumer
 import com.rabbitmq.client.Envelope
 import com.rabbitmq.client.MessageProperties
 import io.github.cvieirasp.shared.config.AppJson
+import io.github.cvieirasp.shared.logging.WebhookEventLogger
 import io.github.cvieirasp.shared.queue.DeliveryJob
 import io.github.cvieirasp.shared.queue.RabbitMQTopology
 import io.github.cvieirasp.worker.delivery.DeliveryRepository
@@ -62,7 +63,7 @@ class DeliveryConsumer(
         try {
             val job = AppJson.decodeFromString<DeliveryJob>(body.toString(Charsets.UTF_8))
             MDC.put("correlationId", job.correlationId)
-            logger.info("Processing delivery={} attempt={}/{}", job.deliveryId, job.attempt, maxAttempts)
+            WebhookEventLogger.deliveryAttempted(job.eventId, job.deliveryId, job.targetUrl, job.attempt)
 
             when (val result = httpClient.post(job.targetUrl, job.payloadJson)) {
                 is HttpDeliveryClient.Result.Success -> {
@@ -77,7 +78,7 @@ class DeliveryConsumer(
                         attempts    = job.attempt,
                         deliveredAt = deliveredAt,
                     )
-                    logger.info("Delivered delivery={}", job.deliveryId)
+                    WebhookEventLogger.deliverySucceeded(job.eventId, job.deliveryId, job.targetUrl, job.attempt)
                 }
 
                 is HttpDeliveryClient.Result.Failure -> {
@@ -104,10 +105,7 @@ class DeliveryConsumer(
                         // hold the message in QUEUE_RETRY before dead-lettering it back to
                         // the main exchange for the next pickup.
                         republishWithDelay(job.copy(attempt = nextAttempt), delayMs)
-                        logger.warn(
-                            "Delivery={} failed (attempt {}/{}); retry in {}ms — {}",
-                            job.deliveryId, job.attempt, maxAttempts, delayMs, result.message,
-                        )
+                        WebhookEventLogger.retryScheduled(job.eventId, job.deliveryId, job.targetUrl, job.attempt, result.message)
                     } else {
                         // Non-retryable error or attempts exhausted.
                         // 1. Persist DEAD status with final error and attempt count.
@@ -122,15 +120,7 @@ class DeliveryConsumer(
                             lastAttemptAt = lastAttemptAt,
                         )
                         publishToDlq(job)
-                        val reason = if (!result.retryable) {
-                            "non-retryable error (HTTP ${result.statusCode})"
-                        } else {
-                            "exhausted $maxAttempts attempts"
-                        }
-                        logger.error(
-                            "Delivery={} marked DEAD after {} — {}",
-                            job.deliveryId, reason, result.message,
-                        )
+                        WebhookEventLogger.deliveryDead(job.eventId, job.deliveryId, job.targetUrl, job.attempt, result.message)
                     }
                 }
             }

@@ -8,6 +8,7 @@ import io.github.cvieirasp.api.delivery.DeliveryRepository
 import io.github.cvieirasp.api.delivery.DeliveryStatus
 import io.github.cvieirasp.api.destination.DestinationRepository
 import io.github.cvieirasp.api.source.SourceRepository
+import io.github.cvieirasp.shared.logging.WebhookEventLogger
 import io.github.cvieirasp.shared.queue.DeliveryJob
 import kotlinx.datetime.Clock
 import java.security.MessageDigest
@@ -39,6 +40,7 @@ class IngestUseCase(
      *         or an empty list if the event was a duplicate.
      */
     fun ingest(sourceName: String, eventType: String, rawBody: ByteArray, signature: String, correlationId: String): List<Delivery> {
+        WebhookEventLogger.eventReceived(sourceName)
         require(eventType.isNotBlank()) { "type must not be blank" }
 
         val source = sourceRepository.findByName(sourceName)
@@ -56,6 +58,8 @@ class IngestUseCase(
         )
         if (!match) throw UnauthorizedException("invalid signature")
 
+        WebhookEventLogger.signatureValidated(sourceName)
+
         val event = Event(
             id = UUID.randomUUID(),
             sourceName = sourceName,
@@ -66,7 +70,10 @@ class IngestUseCase(
             receivedAt = Clock.System.now(),
         )
         val isNew = eventRepository.save(event)
-        if (!isNew) return emptyList()
+        if (!isNew) {
+            WebhookEventLogger.duplicateDetected(sourceName, event.id.toString())
+            return emptyList()
+        }
 
         return destinationRepository.findBySourceNameAndEventType(sourceName, eventType).map { destination ->
             val delivery = Delivery(

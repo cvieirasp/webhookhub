@@ -22,6 +22,7 @@ dependencies {
 
     // Logging
     implementation(libs.logback.classic)
+    implementation(libs.logstash.logback.encoder)
 
     // Tests
     testImplementation(kotlin("test"))

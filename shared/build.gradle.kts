@@ -8,6 +8,7 @@ dependencies {
     implementation(libs.kotlinxDatetime)
     implementation(libs.kotlinxCoroutines)
     implementation(libs.rabbitmq.amqp.client)
+    implementation(libs.slf4j.api)
 
     testImplementation(kotlin("test"))
 }
