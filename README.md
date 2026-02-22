@@ -59,6 +59,9 @@ docker-compose up -d
 | RabbitMQ AMQP | `localhost:5672` | `webhookhub` / `webhookhub` |
 | RabbitMQ Management UI | http://localhost:15672 | `webhookhub` / `webhookhub` |
 | PGAdmin | http://localhost:5050 | `admin@webhookhub.com` / `admin` |
+| Jaeger UI | http://localhost:16686 | — |
+| OTel Collector (gRPC) | `localhost:4317` | — |
+| OTel Collector (HTTP) | `localhost:4318` | — |
 
 **2. Set environment variables**
 
@@ -82,11 +85,22 @@ export RABBITMQ_VHOST=webhookhub
 
 The API starts on `http://localhost:8080`.
 
+Tracing is enabled automatically via the OpenTelemetry Java agent. Traces are exported to the OTel Collector at `http://localhost:4317` and forwarded to Jaeger. View traces at http://localhost:16686.
+
+To disable tracing or point at a different collector:
+
+```bash
+OTEL_TRACES_EXPORTER=none ./gradlew :api:run
+OTEL_EXPORTER_OTLP_ENDPOINT=http://my-collector:4317 ./gradlew :api:run
+```
+
 **4. Run the Worker**
 
 ```bash
 ./gradlew :worker:run
 ```
+
+Same OTel defaults apply — override with `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT`, or `OTEL_TRACES_EXPORTER=none`.
 
 ---
 
@@ -311,7 +325,7 @@ GET /events
   "totalCount": 42,
   "page": 1,
   "pageSize": 20,
-  "items": [ { "id": "...", "sourceName": "...", ... } ]
+  "items": [ { "id": "...", "sourceName": "..." } ]
 }
 ```
 
@@ -362,7 +376,7 @@ GET /deliveries
   "totalCount": 5,
   "page": 1,
   "pageSize": 20,
-  "items": [ { "id": "...", "eventId": "...", "status": "PENDING", ... } ]
+  "items": [ { "id": "...", "eventId": "...", "status": "PENDING" } ]
 }
 ```
 

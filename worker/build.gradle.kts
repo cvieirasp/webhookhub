@@ -3,6 +3,11 @@ plugins {
     application
 }
 
+val otelAgent: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
 dependencies {
     implementation(project(":shared"))
 
@@ -23,6 +28,9 @@ dependencies {
     implementation(libs.logback.classic)
     implementation(libs.logstash.logback.encoder)
 
+    // OpenTelemetry Java agent (agent-only — not on the application classpath)
+    otelAgent(libs.otel.agent)
+
     // Tests
     testImplementation(kotlin("test"))
     testImplementation(libs.bundles.testcontainers)
@@ -31,4 +39,13 @@ dependencies {
 
 application {
     mainClass = "io.github.cvieirasp.worker.MainKt"
+}
+
+tasks.named<JavaExec>("run") {
+    doFirst {
+        jvmArgs("-javaagent:${otelAgent.singleFile.absolutePath}")
+    }
+    environment("OTEL_SERVICE_NAME",             System.getenv("OTEL_SERVICE_NAME")             ?: "webhookhub-worker")
+    environment("OTEL_EXPORTER_OTLP_ENDPOINT",   System.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")   ?: "http://localhost:4317")
+    environment("OTEL_LOGS_EXPORTER",            System.getenv("OTEL_LOGS_EXPORTER")            ?: "none")
 }

@@ -15,6 +15,7 @@ flyway = "10.10.0"
 rabbitmq = "5.20.0"
 logback = "1.5.6"
 logstash = "8.0"
+otel-agent = "2.9.0"
 testcontainers = "1.19.8"
 
 [libraries]
@@ -57,6 +58,9 @@ rabbitmq-amqp-client = { module = "com.rabbitmq:amqp-client", version.ref = "rab
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 logstash-logback-encoder = { module = "net.logstash.logback:logstash-logback-encoder", version.ref = "logstash" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version = "2.0.16" }
+
+# OpenTelemetry
+otel-agent = { module = "io.opentelemetry.javaagent:opentelemetry-javaagent", version.ref = "otel-agent" }
 
 # Testing
 testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
