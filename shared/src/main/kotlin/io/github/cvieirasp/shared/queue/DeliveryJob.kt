@@ -9,5 +9,6 @@ data class DeliveryJob(
     val destinationId: String,
     val targetUrl: String,
     val payloadJson: String,
+    val correlationId: String = "",
     val attempt: Int = 1,
 )

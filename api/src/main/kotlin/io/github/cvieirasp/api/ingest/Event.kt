@@ -9,5 +9,6 @@ data class Event(
     val eventType: String,
     val idempotencyKey: String,
     val payloadJson: String,
+    val correlationId: String,
     val receivedAt: Instant,
 )

@@ -33,6 +33,7 @@ object EventTable : Table("events") {
     val eventType = text("event_type")
     val idempotencyKey = text("idempotency_key")
     val payloadJson = jsonb("payload_json")
+    val correlationId = text("correlation_id")
     val receivedAt = timestamp("received_at")
     override val primaryKey = PrimaryKey(id)
 }

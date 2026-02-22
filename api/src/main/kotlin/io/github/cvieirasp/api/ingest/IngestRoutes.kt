@@ -6,6 +6,8 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.slf4j.MDC
+import java.util.UUID
 
 /**
  * Defines the webhook ingestion route.
@@ -18,13 +20,19 @@ import kotlinx.coroutines.withContext
  */
 fun Route.ingestRoutes(useCase: IngestUseCase) {
     post("/ingest/{sourceName}") {
+        val correlationId = UUID.randomUUID().toString()
         val sourceName = call.parameters["sourceName"]!!
         val eventType = call.queryParameters["type"] ?: ""
         val signature = call.request.headers["X-Signature"] ?: ""
         val rawBody = call.receive<ByteArray>()
 
         withContext(Dispatchers.IO) {
-            useCase.ingest(sourceName, eventType, rawBody, signature)
+            MDC.put("correlationId", correlationId)
+            try {
+                useCase.ingest(sourceName, eventType, rawBody, signature, correlationId)
+            } finally {
+                MDC.remove("correlationId")
+            }
         }
 
         call.respond(HttpStatusCode.Accepted)

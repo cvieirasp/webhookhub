@@ -23,6 +23,7 @@ class EventRepositoryImpl : EventRepository {
                 it[eventType] = event.eventType
                 it[idempotencyKey] = event.idempotencyKey
                 it[payloadJson] = event.payloadJson
+                it[correlationId] = event.correlationId
                 it[receivedAt] = event.receivedAt
             }
         }

@@ -38,7 +38,7 @@ class IngestUseCase(
      * @return A list of [Delivery] records created for this event (one per matching destination),
      *         or an empty list if the event was a duplicate.
      */
-    fun ingest(sourceName: String, eventType: String, rawBody: ByteArray, signature: String): List<Delivery> {
+    fun ingest(sourceName: String, eventType: String, rawBody: ByteArray, signature: String, correlationId: String): List<Delivery> {
         require(eventType.isNotBlank()) { "type must not be blank" }
 
         val source = sourceRepository.findByName(sourceName)
@@ -62,6 +62,7 @@ class IngestUseCase(
             eventType = eventType,
             idempotencyKey = computeIdempotencyKey(sourceName, eventType, rawBody),
             payloadJson = rawBody.toString(Charsets.UTF_8),
+            correlationId = correlationId,
             receivedAt = Clock.System.now(),
         )
         val isNew = eventRepository.save(event)
@@ -83,6 +84,7 @@ class IngestUseCase(
                     destinationId = destination.id.toString(),
                     targetUrl = destination.targetUrl,
                     payloadJson = event.payloadJson,
+                    correlationId = correlationId,
                 )
             )
             delivery

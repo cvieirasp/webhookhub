@@ -47,7 +47,7 @@ class IngestUnitUseCaseTest {
     @Test
     fun `ingest throws when eventType is blank`() {
         val ex = assertFailsWith<IllegalArgumentException> {
-            useCase.ingest("github", "", "body".toByteArray(), "sig")
+            useCase.ingest("github", "", "body".toByteArray(), "sig", "test-correlation-id")
         }
         assertEquals("type must not be blank", ex.message)
     }
@@ -55,7 +55,7 @@ class IngestUnitUseCaseTest {
     @Test
     fun `ingest throws NotFoundException when source does not exist`() {
         assertFailsWith<NotFoundException> {
-            useCase.ingest("unknown", "push", "body".toByteArray(), "sig")
+            useCase.ingest("unknown", "push", "body".toByteArray(), "sig", "test-correlation-id")
         }
     }
 
@@ -63,7 +63,7 @@ class IngestUnitUseCaseTest {
     fun `ingest throws UnauthorizedException when source is inactive`() {
         repository.seed(aSource(name = "github", active = false))
         val ex = assertFailsWith<UnauthorizedException> {
-            useCase.ingest("github", "push", "body".toByteArray(), "sig")
+            useCase.ingest("github", "push", "body".toByteArray(), "sig", "test-correlation-id")
         }
         assertEquals("source is inactive", ex.message)
     }
@@ -72,7 +72,7 @@ class IngestUnitUseCaseTest {
     fun `ingest throws UnauthorizedException when signature is blank`() {
         repository.seed(aSource(name = "github"))
         val ex = assertFailsWith<UnauthorizedException> {
-            useCase.ingest("github", "push", "body".toByteArray(), "")
+            useCase.ingest("github", "push", "body".toByteArray(), "", "test-correlation-id")
         }
         assertEquals("missing signature", ex.message)
     }
@@ -81,7 +81,7 @@ class IngestUnitUseCaseTest {
     fun `ingest throws UnauthorizedException when signature is invalid`() {
         repository.seed(aSource(name = "github", hmacSecret = "a".repeat(64)))
         val ex = assertFailsWith<UnauthorizedException> {
-            useCase.ingest("github", "push", "body".toByteArray(), "invalid-signature")
+            useCase.ingest("github", "push", "body".toByteArray(), "invalid-signature", "test-correlation-id")
         }
         assertEquals("invalid signature", ex.message)
     }
@@ -97,7 +97,7 @@ class IngestUnitUseCaseTest {
         val signature = computeHmac(secret, body)
         repository.seed(aSource(name = "github", hmacSecret = secret))
 
-        val result = useCase.ingest("github", "push", body, signature)
+        val result = useCase.ingest("github", "push", body, signature, "test-correlation-id")
 
         assertEquals(emptyList(), result)
         assertEquals(1, eventRepository.saved.size)
@@ -116,7 +116,7 @@ class IngestUnitUseCaseTest {
         val duplicateRepo = FakeEventRepository(rejectAsDuplicate = true)
         val duplicateUseCase = IngestUseCase(repository, duplicateRepo, destinationRepository, deliveryRepository, deliveryPublisher)
 
-        val result = duplicateUseCase.ingest("github", "push", body, signature)
+        val result = duplicateUseCase.ingest("github", "push", body, signature, "test-correlation-id")
 
         assertEquals(emptyList(), result)
         assertTrue(deliveryRepository.saved.isEmpty())
@@ -130,7 +130,7 @@ class IngestUnitUseCaseTest {
         val signature = computeHmac(secret, body)
         repository.seed(aSource(name = "github", hmacSecret = secret))
 
-        val result = useCase.ingest("github", "push", body, signature)
+        val result = useCase.ingest("github", "push", body, signature, "test-correlation-id")
 
         assertEquals(emptyList(), result)
     }
@@ -146,7 +146,7 @@ class IngestUnitUseCaseTest {
         val destination = aDestination(id = destId, targetUrl = "https://example.com/hook", rules = listOf(rule))
         destinationRepository.seed(destination)
 
-        val result = useCase.ingest("github", "push", body, signature)
+        val result = useCase.ingest("github", "push", body, signature, "test-correlation-id")
 
         assertEquals(1, result.size)
         assertEquals(destId, result.first().destinationId)
@@ -163,7 +163,7 @@ class IngestUnitUseCaseTest {
         val rule = aDestinationRule(destinationId = destId, sourceName = "github", eventType = "push")
         destinationRepository.seed(aDestination(id = destId, rules = listOf(rule)))
 
-        useCase.ingest("github", "push", body, signature)
+        useCase.ingest("github", "push", body, signature, "test-correlation-id")
 
         assertEquals(1, deliveryRepository.saved.size)
         assertEquals(destId, deliveryRepository.saved.first().destinationId)
@@ -180,7 +180,7 @@ class IngestUnitUseCaseTest {
         val rule = aDestinationRule(destinationId = destId, sourceName = "github", eventType = "push")
         destinationRepository.seed(aDestination(id = destId, targetUrl = "https://example.com/hook", rules = listOf(rule)))
 
-        useCase.ingest("github", "push", body, signature)
+        useCase.ingest("github", "push", body, signature, "test-correlation-id")
 
         assertEquals(1, deliveryPublisher.published.size)
         with(deliveryPublisher.published.first()) {
@@ -199,7 +199,7 @@ class IngestUnitUseCaseTest {
         val rule = aDestinationRule(destinationId = destId, sourceName = "github", eventType = "other-event")
         destinationRepository.seed(aDestination(id = destId, rules = listOf(rule)))
 
-        val result = useCase.ingest("github", "push", body, signature)
+        val result = useCase.ingest("github", "push", body, signature, "test-correlation-id")
 
         assertEquals(emptyList(), result)
         assertTrue(deliveryRepository.saved.isEmpty())
