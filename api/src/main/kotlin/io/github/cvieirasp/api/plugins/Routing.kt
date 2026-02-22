@@ -3,7 +3,9 @@ package io.github.cvieirasp.api.plugins
 import io.github.cvieirasp.api.db.DatabaseFactory
 import io.github.cvieirasp.api.db.DbPoolStats
 import io.github.cvieirasp.api.delivery.DeliveryRepositoryImpl
+import io.github.cvieirasp.api.delivery.DeliveryUseCase
 import io.github.cvieirasp.api.delivery.RabbitMQDeliveryPublisher
+import io.github.cvieirasp.api.delivery.deliveryRoutes
 import io.github.cvieirasp.api.ingest.EventRepositoryImpl
 import io.github.cvieirasp.api.ingest.EventUseCase
 import io.github.cvieirasp.api.ingest.IngestUseCase
@@ -32,6 +34,7 @@ data class HealthResponse(val status: String, val db: String, val pool: DbPoolSt
 fun Application.configureRouting() {
     val sourceUseCase = SourceUseCase(SourceRepositoryImpl())
     val destinationUseCase = DestinationUseCase(DestinationRepositoryImpl())
+    val deliveryUseCase = DeliveryUseCase(DeliveryRepositoryImpl())
     val eventUseCase = EventUseCase(EventRepositoryImpl())
     val ingestUseCase = IngestUseCase(
         SourceRepositoryImpl(),
@@ -55,6 +58,7 @@ fun Application.configureRouting() {
 
         sourceRoutes(sourceUseCase)
         destinationRoutes(destinationUseCase)
+        deliveryRoutes(deliveryUseCase)
         eventRoutes(eventUseCase)
         ingestRoutes(ingestUseCase)
     }

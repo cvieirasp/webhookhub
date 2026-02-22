@@ -15,6 +15,18 @@ class FakeDeliveryRepository : DeliveryRepository {
         saved.add(delivery)
         return delivery
     }
+
+    override fun findById(id: UUID): Delivery? = saved.find { it.id == id }
+
+    override fun findFiltered(filter: DeliveryFilter, page: Int, pageSize: Int): Pair<Long, List<Delivery>> {
+        val filtered = saved.filter { delivery ->
+            (filter.status  == null || delivery.status  == filter.status) &&
+            (filter.eventId == null || delivery.eventId == filter.eventId)
+        }.sortedByDescending { it.createdAt }
+        val total = filtered.size.toLong()
+        val items = filtered.drop((page - 1) * pageSize).take(pageSize)
+        return total to items
+    }
 }
 
 /**
