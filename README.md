@@ -37,6 +37,74 @@ Retry topology (RabbitMQ):
 
 ---
 
+## Design decisions
+
+### Why split into API, Worker, and Shared?
+
+The system separates ingestion from delivery because the two workloads have fundamentally different runtime characteristics.
+
+The **API** is request-driven: it must respond in milliseconds, validate signatures, persist the event, and enqueue a job. Tying delivery into the request cycle would couple latency to the health of every downstream destination — one slow or failing webhook target would block the caller.
+
+The **Worker** is queue-driven: it runs as a long-lived consumer, owns all retry logic, and interacts with destination URLs that may be slow or unavailable. Its concurrency is controlled independently via RabbitMQ prefetch count (`basicQos(5)`), not by the HTTP thread pool of the API. Both processes can be scaled, deployed, and restarted independently.
+
+The **Shared** module exists to eliminate duplication without coupling. The API publishes `DeliveryJob` messages and the Worker consumes them — they must agree on the same wire format. Likewise, both processes declare the RabbitMQ topology on startup; declaring it in a single `RabbitMQTopology.declare()` call in Shared guarantees they always agree on exchange names, queue arguments, and bindings, with no risk of drift between the two codebases.
+
+---
+
+### Why feature-based packages rather than layer-based?
+
+Each module is organised by **feature** (`source`, `destination`, `ingest`, `delivery`) rather than by layer (`controllers`, `services`, `repositories`). Every feature folder owns its domain model, table definition, repository interface and implementation, use case, and routes.
+
+This keeps related code co-located. When working on delivery retries, for example, everything relevant is under `delivery/`; there is no need to jump between a `controllers/` package, a `services/` package, and a `repositories/` package to understand a single feature. Adding, changing, or deleting a feature is a self-contained operation.
+
+Layer-based organisation tends to produce high coupling between distant files and low cohesion within each layer. Feature-based organisation inverts that: each feature is highly cohesive and minimally coupled to other features.
+
+---
+
+### Why the Use Case layer?
+
+Each feature exposes its logic through a **use case class** (`IngestUseCase`, `DeliveryUseCase`, etc.) rather than putting business logic directly inside route handlers or repository implementations.
+
+This separation means:
+
+- **Routes stay thin.** They parse the HTTP request, call the use case, and map the result to a response. They contain no business rules.
+- **Use cases are independently testable.** They receive their dependencies (repositories, publishers) via constructor injection. Unit tests can pass fakes or mocks without spinning up a Ktor server or a database.
+- **Business logic is named explicitly.** A use case method like `ingest(sourceName, eventType, signature, rawBody)` documents a business operation; a route handler that does the same work inline does not.
+
+---
+
+### Why repository interfaces?
+
+Repositories are defined as interfaces and injected into use cases. The API integration tests and worker integration tests run against real PostgreSQL containers via Testcontainers, but individual use case unit tests can use simple in-memory fakes.
+
+This also keeps the persistence technology out of the business logic. The use case knows nothing about SQL, Exposed table objects, or HikariCP — it calls `eventRepository.save(event)` and moves on.
+
+---
+
+### Why Ktor instead of Spring?
+
+Ktor is lightweight and coroutine-native. It starts fast, requires minimal configuration, and has no hidden "magic" — every plugin, route, and serialiser is registered explicitly in code. This makes the startup sequence easy to follow and test.
+
+Spring Boot's abstractions are valuable in large teams maintaining large codebases, but for a focused service like this they introduce overhead (annotation scanning, proxy generation, autoconfiguration) without adding proportional value.
+
+---
+
+### Why Exposed instead of JPA/Hibernate?
+
+Exposed's SQL DSL means the queries written in the repository implementations are very close to the SQL that will actually run. There is no session lifecycle, no lazy-loading surprise, no N+1 query to hunt down, and no entity state machine to reason about. The mapping from result set to domain model is explicit and straightforward.
+
+JPA is powerful but trades control for convenience. In a system where delivery throughput and predictable query behaviour matter, explicit SQL is the better trade-off.
+
+---
+
+### Why is PostgreSQL the source of truth and RabbitMQ only a transport?
+
+Every delivery is persisted to PostgreSQL as a `PENDING` record **before** the job is published to RabbitMQ. The broker is used purely for execution scheduling — getting the job to a worker — not for storing state.
+
+This means the database is always authoritative. If RabbitMQ is restarted or a queue is purged, the delivery records remain in Postgres and can be replayed. The worker writes `DELIVERED`, `RETRYING`, or `DEAD` back to the database after each attempt, so the current state of every delivery is always queryable without inspecting the broker.
+
+---
+
 ## Prerequisites
 
 - Docker and Docker Compose
